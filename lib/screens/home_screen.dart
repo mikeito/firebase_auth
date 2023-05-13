@@ -11,7 +11,7 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  final users = FirebaseAuth.instance.currentUser!;
+  final user = FirebaseAuth.instance.currentUser!;
 
   List<String> docIDs = [];
 
@@ -32,7 +32,7 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Text('Home Screen'),
+            Text('Welcome ${user.email}'),
             MaterialButton(
               onPressed: () {
                 FirebaseAuth.instance.signOut();

@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_auth_app/widgets/loading_blur.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -24,6 +25,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
   String errorText = '';
   String errorAvatar = '';
   XFile? chosenImage;
+  String iUrl = '';
+  bool loading = false;
 
   Future pickImage() async {
     final imagefile = await ImagePicker().pickImage(
@@ -33,38 +36,43 @@ class _RegisterScreenState extends State<RegisterScreen> {
       imageQuality: 75,
     );
     setState(() => chosenImage = imagefile);
-
-    // chosenImage = imagefile;
   }
 
-  Future uploadFile() async {
+  Future<String> uploadFile() async {
     Reference ref = FirebaseStorage.instance.ref().child("profilepic.jpg");
     await ref.putFile(File(chosenImage!.path));
-    ref.getDownloadURL().then((imageUrl) {
-      // add user details
-      debugPrint('******* $imageUrl');
-      addUserDetails(
-          _namecontroller.text.trim(), _emailcontroller.text.trim(), imageUrl);
-    });
+    return await ref.getDownloadURL();
   }
 
   Future signUp() async {
-    if (passwordConfirmed()) {
+    print('signup pressed');
+    setState(() => loading = true);
+    // await Future.delayed(const Duration(seconds: 10));
+
+    if (!passwordConfirmed()) {
+      setState(() => errorText = 'Passwords should be the same');
+    } else {
+      setState(() => errorText = '');
+    }
+
+    if (chosenImage == null) {
+      setState(() => errorAvatar = 'Please provide an avatar');
+    } else {
+      setState(() => errorAvatar = '');
+
       await FirebaseAuth.instance.createUserWithEmailAndPassword(
         email: _emailcontroller.text.trim(),
         password: _passwordcontroller.text.trim(),
       );
-    } else {
-      setState(() => errorText = 'Passwords should be the same');
+      iUrl = await uploadFile();
+      await addUserDetails(
+        _namecontroller.text.trim(),
+        _emailcontroller.text.trim(),
+        iUrl,
+      );
     }
 
-    //upload image and get url
-    //then save user data to firestore
-    if (chosenImage != null) {
-      uploadFile();
-    } else {
-      setState(() => errorAvatar = 'Please provide an avatar');
-    }
+    setState(() => loading = false);
   }
 
   Future addUserDetails(String name, String email, String avatarUrl) async {
@@ -94,196 +102,194 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final Size size = MediaQuery.of(context).size;
+
     return Scaffold(
       backgroundColor: Colors.grey[300],
       body: SafeArea(
           child: Center(
         child: SingleChildScrollView(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Text(
-                'JOIN US',
-                // style: GoogleFonts.bebasNeue(fontSize: 52),
-                style: TextStyle(fontSize: 52),
-              ),
-              const SizedBox(
-                height: 10,
-              ),
-              const Text(
-                'We are happy to have you',
-                style: TextStyle(fontSize: 18),
-              ),
-              const SizedBox(height: 50),
-              GestureDetector(
-                onTap: pickImage,
-                child: Row(
+          child: Stack(children: [
+            Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Text(
+                  'JOIN US',
+                  // style: GoogleFonts.bebasNeue(fontSize: 52),
+                  style: TextStyle(fontSize: 52),
+                ),
+                const SizedBox(
+                  height: 10,
+                ),
+                const Text(
+                  'We are happy to have you',
+                  style: TextStyle(fontSize: 18),
+                ),
+                const SizedBox(height: 50),
+                GestureDetector(
+                  onTap: pickImage,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      if (chosenImage != null) ...[
+                        // FileImage(chosenImage),
+
+                        CircleAvatar(
+                          radius: 80,
+                          backgroundImage: FileImage(
+                            File(chosenImage!.path),
+                          ),
+                        ),
+                      ] else ...[
+                        const CircleAvatar(
+                          radius: 80,
+                          child: Icon(
+                            Icons.person_2_outlined,
+                            size: 100,
+                            color: Colors.black,
+                          ),
+                        )
+                      ]
+                    ],
+                  ),
+                ),
+                Text(
+                  errorAvatar,
+                  style: const TextStyle(color: Colors.red),
+                ),
+                const SizedBox(height: 20),
+
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 25.0),
+                  child: TextField(
+                    controller: _namecontroller,
+                    decoration: InputDecoration(
+                      enabledBorder: OutlineInputBorder(
+                        borderSide: const BorderSide(color: Colors.white),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderSide: const BorderSide(color: Colors.deepPurple),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      hintText: 'Full name',
+                      fillColor: Colors.grey[200],
+                      filled: true,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 25.0),
+                  child: TextField(
+                    controller: _emailcontroller,
+                    decoration: InputDecoration(
+                      enabledBorder: OutlineInputBorder(
+                        borderSide: const BorderSide(color: Colors.white),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderSide: const BorderSide(color: Colors.deepPurple),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      hintText: 'Email',
+                      fillColor: Colors.grey[200],
+                      filled: true,
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 10),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 25.0),
+                  child: TextField(
+                    controller: _passwordcontroller,
+                    decoration: InputDecoration(
+                      enabledBorder: OutlineInputBorder(
+                        borderSide: const BorderSide(color: Colors.white),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderSide: const BorderSide(color: Colors.deepPurple),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      hintText: 'Password',
+                      fillColor: Colors.grey[200],
+                      filled: true,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 25.0),
+                  child: TextField(
+                    controller: _confirmpasswordcontroller,
+                    decoration: InputDecoration(
+                      enabledBorder: OutlineInputBorder(
+                        borderSide: const BorderSide(color: Colors.white),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderSide: const BorderSide(color: Colors.deepPurple),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      hintText: 'Confirm Password',
+                      fillColor: Colors.grey[200],
+                      filled: true,
+                    ),
+                  ),
+                ),
+                // errorText != '' ? Text(errorText, style: TextStyle(color: Colors.redAccent),) : null,
+                Text(
+                  errorText,
+                  style: const TextStyle(color: Colors.red),
+                ),
+                const SizedBox(height: 10),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 25.0),
+                  child: GestureDetector(
+                    onTap: () => signUp(),
+                    child: Container(
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: Colors.deepOrange,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Center(
+                        child: Text(
+                          'Sign Up',
+                          style: TextStyle(
+                              fontSize: 18,
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 25),
+                Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    if (chosenImage != null) ...[
-                      // FileImage(chosenImage),
-
-                      CircleAvatar(
-                        radius: 80,
-                        backgroundImage: FileImage(
-                          File(chosenImage!.path),
-                        ),
-                        // child: Image.file(
-                        //   File(chosenImage!.path),
-                        //   // width: 200,
-                        //   // height: 200,
-                        //   // chosenImage,
-                        //   errorBuilder: (BuildContext context, Object error,
-                        //           StackTrace? stackTrace) =>
-                        //       const Center(
-                        //           child:
-                        //               Text('This image type is not supported')),
-                        // ),
+                    const Text(
+                      'I am a member?',
+                      style: TextStyle(fontSize: 18),
+                    ),
+                    const SizedBox(width: 10.0),
+                    GestureDetector(
+                      onTap: widget.showLoginScreen,
+                      child: const Text(
+                        'Login now',
+                        style:
+                            TextStyle(fontSize: 18, color: Colors.deepOrange),
                       ),
-                    ] else ...[
-                      const Icon(
-                        Icons.person_2_outlined,
-                        size: 100,
-                        color: Colors.black,
-                      )
-                    ]
+                    ),
                   ],
                 ),
-              ),
-              Text(
-                errorAvatar,
-                style: const TextStyle(color: Colors.red),
-              ),
-              const SizedBox(height: 20),
-
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 25.0),
-                child: TextField(
-                  controller: _namecontroller,
-                  decoration: InputDecoration(
-                    enabledBorder: OutlineInputBorder(
-                      borderSide: const BorderSide(color: Colors.white),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderSide: const BorderSide(color: Colors.deepPurple),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    hintText: 'Full name',
-                    fillColor: Colors.grey[200],
-                    filled: true,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 10),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 25.0),
-                child: TextField(
-                  controller: _emailcontroller,
-                  decoration: InputDecoration(
-                    enabledBorder: OutlineInputBorder(
-                      borderSide: const BorderSide(color: Colors.white),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderSide: const BorderSide(color: Colors.deepPurple),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    hintText: 'Email',
-                    fillColor: Colors.grey[200],
-                    filled: true,
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 10),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 25.0),
-                child: TextField(
-                  controller: _passwordcontroller,
-                  decoration: InputDecoration(
-                    enabledBorder: OutlineInputBorder(
-                      borderSide: const BorderSide(color: Colors.white),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderSide: const BorderSide(color: Colors.deepPurple),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    hintText: 'Password',
-                    fillColor: Colors.grey[200],
-                    filled: true,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 10),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 25.0),
-                child: TextField(
-                  controller: _confirmpasswordcontroller,
-                  decoration: InputDecoration(
-                    enabledBorder: OutlineInputBorder(
-                      borderSide: const BorderSide(color: Colors.white),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderSide: const BorderSide(color: Colors.deepPurple),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    hintText: 'Confirm Password',
-                    fillColor: Colors.grey[200],
-                    filled: true,
-                  ),
-                ),
-              ),
-              // errorText != '' ? Text(errorText, style: TextStyle(color: Colors.redAccent),) : null,
-              Text(
-                errorText,
-                style: const TextStyle(color: Colors.red),
-              ),
-              const SizedBox(height: 10),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 25.0),
-                child: GestureDetector(
-                  onTap: () => signUp,
-                  child: Container(
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: Colors.deepOrange,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Center(
-                      child: Text(
-                        'Sign In',
-                        style: TextStyle(
-                            fontSize: 18,
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 25),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Text(
-                    'I am a member?',
-                    style: TextStyle(fontSize: 18),
-                  ),
-                  const SizedBox(width: 10.0),
-                  GestureDetector(
-                    onTap: widget.showLoginScreen,
-                    child: const Text(
-                      'Login now',
-                      style: TextStyle(fontSize: 18, color: Colors.deepOrange),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
+              ],
+            ),
+            if (loading) ...[LoadingBlur(size: size)],
+          ]),
         ),
       )),
     );
